@@ -51,40 +51,41 @@
 % dispatch to workers
 %
 
--spec(stanza_to_payload(message()) -> [{atom(), any()}]).
-stanza_to_payload(#message{id = Id, sub_els = SubEls } = Msg) ->
-  PushType = case fxml:get_subtag(#xmlel{ children = SubEls }, <<"push">>) of
-    false -> [];
-    PushTag = #xmlel{} ->
-      case fxml:get_tag_attr_s(<<"type">>, PushTag) of
-        <<"hidden">> -> [
-          {push_type, hidden},
-          {apns_push_type, ?ALERT}
-        ];
-        <<"call">> -> [
-          {push_type, call},
-          {apns_push_type, ?VOIP}
-        ];
-        <<"none">> -> [
-          {push_type, none},
-          {apns_push_type, ?ALERT}
-        ];
-        <<"message">> -> [
-            {push_type, message},
-            {apns_push_type, ?ALERT},
-            {from, jid:to_string(Msg#message.from)}
-          ];
-        <<"body">> -> [
-            {push_type, body},
-            {body, Msg#message.body},
-            {apns_push_type, ?ALERT},
-            {from, jid:to_string(Msg#message.from)}
-          ];
-        _ -> []
-      end
-  end,
-  [{id, Id} | PushType];
-stanza_to_payload(_) -> [].
+stanza_to_payload(MsgId, MsgType, MsgStatus, FromUser, Data) ->
+  PushType = case get_msg_type(MsgType,MsgStatus) of
+              call -> [
+                  {push_type, call},
+                  {apns_push_type, ?VOIP}
+                ];
+              message -> [
+                {push_type, message},
+                {apns_push_type, ?ALERT},
+                {title, get_title(MsgType, MsgStatus, FromUser)},
+                {from, FromUser}
+              ];
+              body -> [
+                {push_type, body},
+                {apns_push_type, ?ALERT},
+                {title, get_title(MsgType, MsgStatus, FromUser)},
+                {body, get_body(Data)},
+                {from, FromUser}
+              ];
+              _ -> []
+             end,
+  [{id, MsgId} | PushType];
+stanza_to_payload(MsgId, MsgType, MsgStatus, FromUser, Data) -> [].
+
+get_msg_type(MsgType,MsgStatus) ->
+  case {MsgType,MsgStatus} of
+    {voice, start} -> call;
+    {video, start} -> call;
+    {location, _} -> message;
+    {photo, _} -> message;
+    {files, _} -> message;
+    {video, _} -> message;
+    {voice, _} -> message;
+    {_, _} -> body
+  end.
 
 -spec(dispatch(pushoff_registration(), [{atom(), any()}]) -> ok).
 
@@ -93,19 +94,92 @@ dispatch(#pushoff_registration{key = Key, token = Token, timestamp = Timestamp, 
   gen_server:cast(backend_worker(BackendId), {dispatch, Key, Payload, Token, DisableArgs}),
   ok.
 
+is_muc(From) ->
+  #jid{lserver = Server}  = From,
+  Hosts = [ mod_muc_opt:host(X) || X <- ejabberd_option:hosts() ],
+  lists:member(Server, Hosts).
+
+get_room_title(From) ->
+  #jid {luser = RoomId, lserver = Server}  = From,
+  TupleList = mod_muc_admin:get_room_options(RoomId,Server),
+  case lists:keyfind(<<"title">>, 1, TupleList) of
+    {_, Title} ->
+      binary_to_list(Title);
+    _ ->
+      ""
+  end.
 
 %
 % ejabberd hooks
 %
-
 -spec(offline_message({atom(), message()}) -> {atom(), message()}).
-offline_message({_, #message{to = #jid{lserver = LServer} = To} = Stanza} = Acc) ->
+offline_message({_, #message{to = #jid{lserver = LServer} = To,
+  from = From, id = Id, body = [#text{data = Data}] = Body} = Stanza} = Acc) ->
   ?DEBUG("Stanza:~p~n",[Stanza]),
-  Payload = stanza_to_payload(Stanza),
+  ToJID = jid:tolower(jid:remove_resource(To)),
+  case string:slice(Data, 0, 19) of
+    <<"aesgcm://w-4all.com">> -> %% Messages start with aesgcm are video or voice messages.
+      ok;
+    _ ->
+      case is_muc(From) of
+        true ->
+          FromResource = From#jid.lresource,
+          RoomTitle = get_room_title(From),
+          FromUser = binary_to_list(FromResource) ++ " group " ++  RoomTitle,
+          send_notification(Id, FromUser, ToJID, Data, offline, missed);
+        _ ->
+          case Body of
+            [] ->
+              ok;
+            _ ->
+              #jid{user = FromUser} = From,
+              send_notification(Id, binary_to_list(FromUser), ToJID, Data, offline, missed)
+          end
+      end
+  end,
+  Acc;
+offline_message({_, #message{to = #jid{lserver = LServer} = To,
+  from = From, id = Id} = Stanza} = Acc) ->
+  case xmpp:try_subtag(Stanza, #push_notification{}) of
+    false ->
+      ok;
+    Record ->
+      case Record of
+        #push_notification{xdata = #xdata{fields = [#xdata_field{var = <<"type">>, values=[Type]},
+          #xdata_field{var = <<"message">>, values = [MsgBinary]}]}} ->
+          Type2 = binary_to_atom(string:lowercase(Type), unicode),
+          ToJID = jid:tolower(jid:remove_resource(To)),
+          #jid{user = FromUser} = From,
+          send_notification(Id, binary_to_list(FromUser), ToJID, MsgBinary, Type2, ok);
+
+        #push_notification{xdata = #xdata{fields = [#xdata_field{var = <<"type">>, values=[Type]},
+          #xdata_field{var = <<"status">>, values = [StatusBinary]}]}} ->
+
+          Status = binary_to_atom(string:lowercase(StatusBinary), unicode),
+          case Status of
+            start ->
+              ?DEBUG("Status is start, do nothing when user offline.~n",[]),
+              ok;
+            _ ->
+              ?DEBUG("Status is not start, send offfline notification.~n",[]),
+              Type2 = binary_to_atom(string:lowercase(Type), unicode),
+              ToJID = jid:tolower(jid:remove_resource(To)),
+              #jid{user = FromUser} = From,
+              send_notification(Id, binary_to_list(FromUser), ToJID, <<>>, Type2, Status)
+          end;
+        _ ->
+          ok
+      end
+  end,
+  Acc.
+
+send_notification(MsgId, FromUser, Data, To, MsgType, MsgStatus) ->
+  Payload = stanza_to_payload(MsgId, MsgType, MsgStatus, FromUser, Data),
   case proplists:get_value(push_type, Payload, none) of
     none ->
       ok;
     call ->
+      LServer = To#jid.lserver,
       Key = {To#jid.luser, To#jid.lserver, ?VOIP_PUSH_TYPE},
       Mod = gen_mod:db_mod(LServer, ?MODULE),
       case Mod:list_registrations(Key) of
@@ -113,12 +187,12 @@ offline_message({_, #message{to = #jid{lserver = LServer} = To} = Stanza} = Acc)
           ?DEBUG("~p is not_subscribed", [To]),
           ok;
         {registrations, Rs} ->
-
           [dispatch(R, Payload) || R <- Rs],
           ok;
         {error, _} -> ok
       end;
     _ ->
+      LServer = To#jid.lserver,
       Key = {To#jid.luser, To#jid.lserver, ?NORMAL_PUSH_TYPE},
       Mod = gen_mod:db_mod(LServer, ?MODULE),
       case Mod:list_registrations(Key) of
@@ -132,7 +206,7 @@ offline_message({_, #message{to = #jid{lserver = LServer} = To} = Stanza} = Acc)
         {error, _} -> ok
       end
   end,
-  Acc.
+  ok.
 
 -spec(unregister_client({key(), erlang:timestamp()}) ->
   {error, stanza_error()} |
@@ -159,9 +233,9 @@ adhoc_local_commands(Acc, From, To, #adhoc_command{node = Command, action = exec
     Access = gen_mod:get_module_opt(Host, ?MODULE, access_backends),
     Result = case acl:match_rule(Host, Access, From) of
         deny -> {error, xmpp:err_forbidden()};
-        allow -> adhoc_perform_action(Command, From, XData)
+        allow ->
+          adhoc_perform_action(Command, From, XData)
     end,
-
     case Result of
         unknown -> Acc;
         {error, Error} -> {error, Error};
@@ -170,23 +244,23 @@ adhoc_local_commands(Acc, From, To, #adhoc_command{node = Command, action = exec
 
         {unregistered, Regs} ->
             X = xmpp_util:set_xdata_field(#xdata_field{var = <<"removed-registrations">>,
-                                                       values = [T || #pushoff_registration{token=T} <- Regs]}, #xdata{}),
+                                                       values = [ T || #pushoff_registration{token=T} <- Regs]}, #xdata{}),
             xmpp_util:make_adhoc_response(Req, #adhoc_command{status = completed, xdata = X});
-
         {registrations, Regs} ->
             X = xmpp_util:set_xdata_field(#xdata_field{var = <<"registrations">>,
-                                                       values = [T || #pushoff_registration{token=T} <- Regs]}, #xdata{}),
+                                                       values = [ T || #pushoff_registration{token=T} <- Regs]}, #xdata{}),
             xmpp_util:make_adhoc_response(Req, #adhoc_command{status = completed, xdata = X})
     end;
 adhoc_local_commands(Acc, _From, _To, _Request) ->
     Acc.
 
 
-adhoc_perform_action(<<"register-push-apns-h2">>, #jid{lserver = LServer} = From, XData) ->
+adhoc_perform_action(<<"register-push-apns">>, #jid{lserver = LServer} = From, XData) ->
     BackendRef = case xmpp_util:get_xdata_values(<<"backend_ref">>, XData) of
         [Key] -> {mod_pushoff_apns_h2, Key};
-        _ -> undefined
+        _ -> {mod_pushoff_apns_h2, <<"apn">>}
     end,
+
     case validate_backend_ref(LServer, BackendRef) of
         {error, E} -> {error, E};
         {ok, BackendRef} ->
@@ -202,10 +276,10 @@ adhoc_perform_action(<<"register-push-apns-h2">>, #jid{lserver = LServer} = From
                 _ -> {error, xmpp:err_bad_request()}
             end
     end;
-adhoc_perform_action(<<"register-push-apns-h2-voip">>, #jid{lserver = LServer} = From, XData) ->
+adhoc_perform_action(<<"register-push-apns-voip">>, #jid{lserver = LServer} = From, XData) ->
   BackendRef = case xmpp_util:get_xdata_values(<<"backend_ref">>, XData) of
                  [Key] -> {mod_pushoff_apns_h2, Key};
-                 _ -> undefined
+                 _ -> {mod_pushoff_apns_h2, <<"voip">>}
                end,
   case validate_backend_ref(LServer, BackendRef) of
     {error, E} -> {error, E};
@@ -222,50 +296,10 @@ adhoc_perform_action(<<"register-push-apns-h2-voip">>, #jid{lserver = LServer} =
         _ -> {error, xmpp:err_bad_request()}
       end
   end;
-adhoc_perform_action(<<"register-push-apns">>, #jid{lserver = LServer} = From, XData) ->
-    BackendRef = case xmpp_util:get_xdata_values(<<"backend_ref">>, XData) of
-        [Key] -> {mod_pushoff_apns, Key};
-        _ -> mod_pushoff_apns
-    end,
-    case validate_backend_ref(LServer, BackendRef) of
-        {error, E} -> {error, E};
-        {ok, BackendRef} ->
-            case xmpp_util:get_xdata_values(<<"token">>, XData) of
-                [Base64Token] ->
-                    case catch base64:decode(Base64Token) of
-                        {'EXIT', _} -> {error, xmpp:err_bad_request()};
-                        _Token ->
-                          Key2 = {From#jid.user, From#jid.server, ?NORMAL_PUSH_TYPE},
-                          Mod = gen_mod:db_mod(LServer, ?MODULE),
-                          Mod:register_client(Key2, {LServer, BackendRef}, Base64Token)
-                    end;
-                _ -> {error, xmpp:err_bad_request()}
-            end
-    end;
-adhoc_perform_action(<<"register-push-apns-voip">>, #jid{lserver = LServer} = From, XData) ->
-  BackendRef = case xmpp_util:get_xdata_values(<<"backend_ref">>, XData) of
-                 [Key] -> {mod_pushoff_apns, Key};
-                 _ -> mod_pushoff_apns
-               end,
-  case validate_backend_ref(LServer, BackendRef) of
-    {error, E} -> {error, E};
-    {ok, BackendRef} ->
-      case xmpp_util:get_xdata_values(<<"token">>, XData) of
-        [Base64Token] ->
-          case catch base64:decode(Base64Token) of
-            {'EXIT', _} -> {error, xmpp:err_bad_request()};
-            _Token ->
-              Key2 = {From#jid.luser, From#jid.lserver, ?VOIP_PUSH_TYPE},
-              Mod = gen_mod:db_mod(LServer, ?MODULE),
-              Mod:register_client(Key2, {LServer, BackendRef}, Base64Token)
-          end;
-        _ -> {error, xmpp:err_bad_request()}
-      end
-  end;
 adhoc_perform_action(<<"register-push-fcm">>, #jid{lserver = LServer} = From, XData) ->
     BackendRef = case xmpp_util:get_xdata_values(<<"backend_ref">>, XData) of
         [Key] -> {fcm, Key};
-        _ -> fcm
+        _ -> {fcm,<<"fcm">>}
     end,
     case validate_backend_ref(LServer, BackendRef) of
         {error, E} -> {error, E};
@@ -421,3 +455,32 @@ health() ->
     Hosts = ejabberd_config:get_myhosts(),
     [{offline_message_hook, [ets:lookup(hooks, {offline_message_hook, H}) || H <- Hosts]},
      {adhoc_local_commands, [ets:lookup(hooks, {adhoc_local_commands, H}) || H <- Hosts]}].
+
+get_title(voice, start, FromUser) ->
+  "voice call from " ++ FromUser;
+get_title(video, start, FromUser) ->
+  "Video call from " ++ FromUser;
+get_title(voice, missed, FromUser) ->
+  "Missed a voice call from " ++ FromUser;
+get_title(video, missed, FromUser) ->
+  "Missed a video call from " ++ FromUser;
+get_title(location, _, FromUser) ->
+  "Location message from " ++ FromUser;
+get_title(photo, _, FromUser) ->
+  "Photo message from " ++ FromUser;
+get_title(files, _, FromUser) ->
+  "File message from " ++ FromUser;
+get_title(voice, _, FromUser) ->
+  "Voice message from " ++ FromUser;
+get_title(video, _, FromUser) ->
+  "Video message from " ++ FromUser;
+get_title(_, _, FromUser) ->
+  "Text message from" ++ FromUser.
+
+get_body(Body) ->
+  [Data2 | _Rest] = string:split(Body, "\n"),
+  Len = string:length(Data2),
+  MsgBody = if Len > 15 -> string:slice(binary_to_list(Data2),0,15) ++ "...";
+              true -> binary_to_list(Data2)
+            end,
+  MsgBody.

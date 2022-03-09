@@ -5,6 +5,7 @@
 -record(pushoff_registration, {key :: key(),
                                token :: binary(),
                                backend_id :: backend_id(),
+                               backend_ref :: backend_ref(),
                                timestamp :: erlang:timestamp()}).
 
 -type pushoff_registration() :: #pushoff_registration{}.

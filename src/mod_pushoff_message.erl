@@ -3,17 +3,14 @@
 
 %% API
 -export([
-  body/1, from/1, apns_push_type/1
+  body/1, title/1, from/1, apns_push_type/1
 ]).
 
 body(Payload) ->
-  PushType = proplists:get_value(push_type, Payload),
-  case PushType of
-    hidden -> <<"Hidden Message">>;
-    call -> <<"Call message">>;
-    message -> <<"Incoming chat message">>;
-    body -> proplists:get_value(body, Payload)
-  end.
+  proplists:get_value(body, Payload).
+
+title(Payload) ->
+  proplists:get_value(title, Payload).
 
 from(Payload) ->
   proplists:get_value(from, Payload, <<>>).

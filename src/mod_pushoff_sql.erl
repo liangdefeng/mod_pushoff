@@ -110,6 +110,7 @@ unregister_client({Key, Timestamp}) ->
             key = Key,
             token = Token,
             backend_id = {BackendServer, {binary_to_atom(BackendId, utf8), BackendRef}},
+            backend_ref = BackendRef,
             timestamp = Time}
             || {_Barejid, _PushType, Token, BackendServer, BackendId, BackendRef, Time} <- Result],
           {unregistered, RetList};
@@ -149,6 +150,7 @@ unregister_client(User, Server) ->
             key = {User, Server, PushType},
             token = Token,
             backend_id = {BackendServer, {binary_to_atom(BackendId, utf8), BackendRef}},
+            backend_ref = BackendRef,
             timestamp = Time}
             || {_Barejid, PushType, Token, BackendServer, BackendId, BackendRef, Time} <- Result],
           {unregistered, RetList};
@@ -183,6 +185,7 @@ list_registrations(Key) ->
         key = Key,
         token = Token,
         backend_id = {BackendServer, {binary_to_atom(BackendId, utf8), BackendRef}},
+        backend_ref = BackendRef,
         timestamp = Time}
         || {_Barejid, _PushType, Token, BackendServer, BackendId, BackendRef, Time} <- Result],
       {registrations, RegList};
@@ -209,6 +212,7 @@ list_registrations_all({User, Server}) ->
         key = {User, Server, PushType},
         token = Token,
         backend_id = {BackendServer, {binary_to_atom(BackendId, utf8), BackendRef}},
+        backend_ref = BackendRef,
         timestamp = Time}
         || {_Barejid, PushType, Token, BackendServer, BackendId, BackendRef, Time} <- Result],
       {registrations, RegList};

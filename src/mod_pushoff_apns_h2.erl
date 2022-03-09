@@ -175,8 +175,20 @@ alert_headers(APNS, Topic, Base64Token, ApnsPushType) ->
     ++ [{<<"apns-push-type">>, iolist_to_binary(ApnsPushType)}, {<<"apns-topic">>,Topic}, {<<"apns-priority">>,<<"10">>}].
 
 render_payload(Payload) ->
-    Message = mod_pushoff_message:body(Payload),
-    <<"{ \"aps\" : { \"alert\" : \"", Message/binary, "\", \"mutable-content\": 1 }, \"message-id\": 42 }">>.
+    Body = mod_pushoff_message:body(Payload),
+    Title = mod_pushoff_message:title(Payload),
+    case Body of
+        undefined ->
+            <<"{ \"aps\" : { \"alert\" : \"",
+                list_to_binary(Title),
+                "\", \"mutable-content\": 1 }, \"message-id\": 42 }">>;
+        _ ->
+            <<"{ \"aps\" : { \"alert\" : {\"title\":\"",
+                list_to_binary(Title),
+                "\", \"body\":\"",
+                list_to_binary(Body),
+                "\"}, \"mutable-content\": 1 }, \"message-id\": 42 }">>
+    end.
 
 make_request(APNS, Topic, {dispatch, _UserBare, Payload, Token, _DisableArgs}) ->
     {alert_headers(APNS, Topic, Token, mod_pushoff_message:apns_push_type(Payload)), render_payload(Payload)}.
