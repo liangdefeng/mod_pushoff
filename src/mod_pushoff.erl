@@ -73,7 +73,7 @@ stanza_to_payload(MsgId, MsgType, MsgStatus, FromUser, Data) ->
               _ -> []
              end,
   [{id, MsgId} | PushType];
-stanza_to_payload(MsgId, MsgType, MsgStatus, FromUser, Data) -> [].
+stanza_to_payload(_MsgId, _MsgType, _MsgStatus, _FromUser, _Data) -> [].
 
 get_msg_type(MsgType,MsgStatus) ->
   case {MsgType,MsgStatus} of

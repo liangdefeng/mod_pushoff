@@ -175,18 +175,18 @@ alert_headers(APNS, Topic, Base64Token, ApnsPushType) ->
     ++ [{<<"apns-push-type">>, iolist_to_binary(ApnsPushType)}, {<<"apns-topic">>,Topic}, {<<"apns-priority">>,<<"10">>}].
 
 render_payload(Payload) ->
-    Body = mod_pushoff_message:body(Payload),
-    Title = mod_pushoff_message:title(Payload),
+    Body = list_to_binary(mod_pushoff_message:body(Payload)),
+    Title = list_to_binary(mod_pushoff_message:title(Payload)),
     case Body of
         undefined ->
             <<"{ \"aps\" : { \"alert\" : \"",
-                list_to_binary(Title),
+                Title/binary,
                 "\", \"mutable-content\": 1 }, \"message-id\": 42 }">>;
         _ ->
             <<"{ \"aps\" : { \"alert\" : {\"title\":\"",
-                list_to_binary(Title),
+                Title/binary,
                 "\", \"body\":\"",
-                list_to_binary(Body),
+                Body/binary,
                 "\"}, \"mutable-content\": 1 }, \"message-id\": 42 }">>
     end.
 
