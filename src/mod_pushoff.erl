@@ -475,4 +475,4 @@ get_title(_, _, FromUser) ->
   "Text message from" ++ FromUser.
 
 get_body(Body) ->
-  Body.
+  binary_to_list(Body).
