@@ -113,10 +113,9 @@ get_room_title(From) ->
 % ejabberd hooks
 %
 -spec(offline_message({atom(), message()}) -> {atom(), message()}).
-offline_message({_, #message{to = #jid{lserver = LServer} = To,
+offline_message({_, #message{to = To,
   from = From, id = Id, body = [#text{data = Data}] = Body} = Stanza} = Acc) ->
   ?DEBUG("Stanza:~p~n",[Stanza]),
-  ToJID = jid:tolower(jid:remove_resource(To)),
   case string:slice(Data, 0, 19) of
     <<"aesgcm://w-4all.com">> -> %% Messages start with aesgcm are video or voice messages.
       ok;
@@ -126,14 +125,14 @@ offline_message({_, #message{to = #jid{lserver = LServer} = To,
           FromResource = From#jid.lresource,
           RoomTitle = get_room_title(From),
           FromUser = binary_to_list(FromResource) ++ " group " ++  RoomTitle,
-          send_notification(Id, FromUser, ToJID, Data, offline, missed);
+          send_notification(Id, FromUser, To, Data, offline, missed);
         _ ->
           case Body of
             [] ->
               ok;
             _ ->
               #jid{user = FromUser} = From,
-              send_notification(Id, binary_to_list(FromUser), ToJID, Data, offline, missed)
+              send_notification(Id, binary_to_list(FromUser), To, Data, offline, missed)
           end
       end
   end,
@@ -148,9 +147,8 @@ offline_message({_, #message{to = #jid{lserver = LServer} = To,
         #push_notification{xdata = #xdata{fields = [#xdata_field{var = <<"type">>, values=[Type]},
           #xdata_field{var = <<"message">>, values = [MsgBinary]}]}} ->
           Type2 = binary_to_atom(string:lowercase(Type), unicode),
-          ToJID = jid:tolower(jid:remove_resource(To)),
           #jid{user = FromUser} = From,
-          send_notification(Id, binary_to_list(FromUser), ToJID, MsgBinary, Type2, ok);
+          send_notification(Id, binary_to_list(FromUser), To, MsgBinary, Type2, ok);
 
         #push_notification{xdata = #xdata{fields = [#xdata_field{var = <<"type">>, values=[Type]},
           #xdata_field{var = <<"status">>, values = [StatusBinary]}]}} ->
@@ -163,9 +161,8 @@ offline_message({_, #message{to = #jid{lserver = LServer} = To,
             _ ->
               ?DEBUG("Status is not start, send offfline notification.~n",[]),
               Type2 = binary_to_atom(string:lowercase(Type), unicode),
-              ToJID = jid:tolower(jid:remove_resource(To)),
               #jid{user = FromUser} = From,
-              send_notification(Id, binary_to_list(FromUser), ToJID, <<>>, Type2, Status)
+              send_notification(Id, binary_to_list(FromUser), To, <<>>, Type2, Status)
           end;
         _ ->
           ok
@@ -173,7 +170,7 @@ offline_message({_, #message{to = #jid{lserver = LServer} = To,
   end,
   Acc.
 
-send_notification(MsgId, FromUser, Data, To, MsgType, MsgStatus) ->
+send_notification(MsgId, FromUser, To, Data, MsgType, MsgStatus) ->
   Payload = stanza_to_payload(MsgId, MsgType, MsgStatus, FromUser, Data),
   case proplists:get_value(push_type, Payload, none) of
     none ->
@@ -478,9 +475,4 @@ get_title(_, _, FromUser) ->
   "Text message from" ++ FromUser.
 
 get_body(Body) ->
-  [Data2 | _Rest] = string:split(Body, "\n"),
-  Len = string:length(Data2),
-  MsgBody = if Len > 15 -> string:slice(binary_to_list(Data2),0,15) ++ "...";
-              true -> binary_to_list(Data2)
-            end,
-  MsgBody.
+  Body.
