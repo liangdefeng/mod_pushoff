@@ -240,12 +240,18 @@ adhoc_local_commands(Acc, From, To, #adhoc_command{node = Command, action = exec
             xmpp_util:make_adhoc_response(Req, #adhoc_command{status = completed});
 
         {unregistered, Regs} ->
-            X = xmpp_util:set_xdata_field(#xdata_field{var = <<"removed-registrations">>,
-                                                       values = [ T || #pushoff_registration{token=T} <- Regs]}, #xdata{}),
+            X = xmpp_util:set_xdata_field(#xdata_field{
+              var = <<"removed-registrations">>,
+              values = [ #xdata_option{label = L, value = T}
+                || #pushoff_registration{token=T, backend_ref = L} <- Regs]},
+              #xdata{}),
             xmpp_util:make_adhoc_response(Req, #adhoc_command{status = completed, xdata = X});
         {registrations, Regs} ->
-            X = xmpp_util:set_xdata_field(#xdata_field{var = <<"registrations">>,
-                                                       values = [ T || #pushoff_registration{token=T} <- Regs]}, #xdata{}),
+            X = xmpp_util:set_xdata_field(#xdata_field{
+              var = <<"registrations">>,
+              values = [ #xdata_option{label = L, value = T}
+                || #pushoff_registration{token=T, backend_ref = L} <- Regs]},
+              #xdata{}),
             xmpp_util:make_adhoc_response(Req, #adhoc_command{status = completed, xdata = X})
     end;
 adhoc_local_commands(Acc, _From, _To, _Request) ->
