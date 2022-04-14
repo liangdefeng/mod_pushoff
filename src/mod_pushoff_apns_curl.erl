@@ -107,12 +107,13 @@ code_change(_OldVsn, State = #state{}, _Extra) ->
 %%%===================================================================
 
 send_notification(Token, Payload, Path, Topic) ->
-  NewToken = base64:decode(Token),
+  NewToken = mod_pushoff_utils:force_string(base64:decode(Token)),
   PushType = mod_pushoff_message:push_type(Payload),
   ApnPushType = mod_pushoff_message:apns_push_type(Payload),
   Title = mod_pushoff_message:title(Payload),
   Body = mod_pushoff_message:body(Payload),
-  execute_curl(PushType, Path, Topic, NewToken, ApnPushType, Title, Body).
+  NewPath = mod_pushoff_utils:force_string(Path),
+  execute_curl(PushType, NewPath, Topic, NewToken, ApnPushType, Title, Body).
 
 execute_curl(body, Path, Topic, Token, ApnPushType, Title, Body) ->
   Cmd = Path
