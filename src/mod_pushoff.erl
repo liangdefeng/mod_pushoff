@@ -116,43 +116,40 @@ get_room_title(From) ->
 -spec(offline_message({atom(), message()}) -> {atom(), message()}).
 offline_message({_, #message{to = To,
   from = From, id = Id, body = [#text{data = Data}] = Body} = Stanza} = Acc) ->
-  ?DEBUG("Stanza:~p~n",[Stanza]),
-  case string:slice(Data, 0, 19) of
-    <<"aesgcm://w-4all.com">> -> %% Messages start with aesgcm are video or voice messages.
-      ok;
-    _ ->
-      case is_muc(From) of
-        true ->
-          FromResource = From#jid.lresource,
-          RoomTitle = get_room_title(From),
-          FromUser = binary_to_list(FromResource) ++ " group " ++  RoomTitle,
-          send_notification(Id, FromUser, To, Data, offline, missed);
-        _ ->
-          case Body of
-            [] ->
-              ok;
-            _ ->
-              #jid{user = FromUser} = From,
-              send_notification(Id, binary_to_list(FromUser), To, Data, offline, missed)
-          end
-      end
-  end,
-  Acc;
-offline_message({_, #message{to = #jid{lserver = _LServer} = To,
-  from = From, id = Id} = Stanza} = Acc) ->
   case xmpp:try_subtag(Stanza, #push_notification{}) of
     false ->
-      ok;
+      case string:slice(Data, 0, 19) of
+        <<"aesgcm://w-4all.com">> -> %% Messages start with aesgcm are video or voice messages.
+          ok;
+        _ ->
+          case is_muc(From) of
+            true ->
+              FromResource = From#jid.lresource,
+              RoomTitle = get_room_title(From),
+              FromUser = binary_to_list(FromResource) ++ " group " ++  RoomTitle,
+              send_notification(Id, FromUser, To, Data, offline, missed);
+            _ ->
+              case Body of
+                [] ->
+                  ok;
+                _ ->
+                  #jid{user = FromUser} = From,
+                  send_notification(Id, binary_to_list(FromUser), To, Data, offline, missed)
+              end
+          end
+      end;
     Record ->
       case Record of
         #push_notification{xdata = #xdata{fields = [#xdata_field{var = <<"type">>, values=[Type]},
           #xdata_field{var = <<"message">>, values = [MsgBinary]}]}} ->
+          ?DEBUG("Type is ~p~n",[Type]),
           Type2 = binary_to_atom(string:lowercase(Type), unicode),
           #jid{user = FromUser} = From,
           send_notification(Id, binary_to_list(FromUser), To, MsgBinary, Type2, ok);
 
         #push_notification{xdata = #xdata{fields = [#xdata_field{var = <<"type">>, values=[Type]},
           #xdata_field{var = <<"status">>, values = [StatusBinary]}]}} ->
+          ?DEBUG("Type is ~p~n",[Type]),
           Status = binary_to_atom(string:lowercase(StatusBinary), unicode),
           case Status of
             start ->
@@ -165,6 +162,7 @@ offline_message({_, #message{to = #jid{lserver = _LServer} = To,
               send_notification(Id, binary_to_list(FromUser), To, <<>>, Type2, Status)
           end;
         #push_notification{xdata = #xdata{fields = [#xdata_field{var = <<"type">>, values=[Type]}]}} ->
+          ?DEBUG("Type is ~p~n",[Type]),
           Type2 = binary_to_atom(string:lowercase(Type), unicode),
           #jid{user = FromUser} = From,
           send_notification(Id, binary_to_list(FromUser), To, "", Type2, ok);
