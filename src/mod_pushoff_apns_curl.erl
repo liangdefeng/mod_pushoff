@@ -113,7 +113,8 @@ send_notification(Token, Payload, Path, Topic) ->
   Title = mod_pushoff_message:title(Payload),
   Body = mod_pushoff_message:body(Payload),
   NewPath = mod_pushoff_utils:force_string(Path),
-  execute_curl(PushType, NewPath, Topic, NewToken, ApnPushType, Title, Body).
+  NewTopic = mod_pushoff_utils:force_string(Topic),
+  execute_curl(PushType, NewPath, NewTopic, NewToken, ApnPushType, Title, Body).
 
 execute_curl(body, Path, Topic, Token, ApnPushType, Title, Body) ->
   Cmd = Path
