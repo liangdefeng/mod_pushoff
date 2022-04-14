@@ -116,6 +116,7 @@ get_room_title(From) ->
 -spec(offline_message({atom(), message()}) -> {atom(), message()}).
 offline_message({_, #message{to = To,
   from = From, id = Id, body = [#text{data = Data}] = Body} = Stanza} = Acc) ->
+  ?DEBUG("Stanza is ~p~n",[Stanza]),
   case xmpp:try_subtag(Stanza, #push_notification{}) of
     false ->
       case string:slice(Data, 0, 19) of
