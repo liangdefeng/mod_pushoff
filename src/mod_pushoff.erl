@@ -43,7 +43,7 @@
 -define(NORMAL_PUSH_TYPE, 0).
 -define(VOIP_PUSH_TYPE, 1).
 
--type apns_config() :: #{backend_type := mod_pushoff_apns_h2, certfile := binary(), gateway := binary(), topic := binary()}.
+-type apns_config() :: #{backend_type := mod_pushoff_apns_curl, path := binary(), topic := binary()}.
 -type fcm_config() :: #{backend_type := mod_pushoff_fcm, gateway := binary(), api_key := binary()}.
 -type backend_config() :: #{ref := backend_ref(), config := apns_config() | fcm_config()}.
 
@@ -406,13 +406,9 @@ parse_backend(Opts) ->
              #{backend_type => mod_pushoff_fcm,
                gateway => proplists:get_value(gateway, Opts),
                api_key => proplists:get_value(api_key, Opts)};
-           mod_pushoff_apns_h2 ->
-                 #{backend_type => mod_pushoff_apns_h2,
-                   certfile => proplists:get_value(certfile, Opts),
-                   team_id => proplists:get_value(team_id, Opts),
-                   key_id => proplists:get_value(key_id, Opts),
-                   key_file => proplists:get_value(key_file, Opts),
-                   gateway => proplists:get_value(gateway, Opts),
+           mod_pushoff_apns_curl ->
+                 #{backend_type => mod_pushoff_apns_curl,
+                   path => proplists:get_value(path, Opts),
                    topic => proplists:get_value(topic, Opts)};
            X ->
              #{backend_type => X,
