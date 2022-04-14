@@ -265,8 +265,8 @@ adhoc_local_commands(Acc, _From, _To, _Request) ->
 
 adhoc_perform_action(<<"register-push-apns">>, #jid{lserver = LServer} = From, XData) ->
     BackendRef = case xmpp_util:get_xdata_values(<<"backend_ref">>, XData) of
-        [Key] -> {mod_pushoff_apns_h2, Key};
-        _ -> {mod_pushoff_apns_h2, <<"apn">>}
+        [Key] -> {mod_pushoff_apns_curl, Key};
+        _ -> {mod_pushoff_apns_curl, <<"apn">>}
     end,
 
     case validate_backend_ref(LServer, BackendRef) of
@@ -274,34 +274,28 @@ adhoc_perform_action(<<"register-push-apns">>, #jid{lserver = LServer} = From, X
         {ok, BackendRef} ->
             case xmpp_util:get_xdata_values(<<"token">>, XData) of
                 [Base64Token] ->
-                    case catch base64:decode(Base64Token) of
-                        {'EXIT', _} -> {error, xmpp:err_bad_request()};
-                        _Token ->
-                          Key2 = {From#jid.luser, From#jid.lserver, ?NORMAL_PUSH_TYPE},
-                          Mod = gen_mod:db_mod(LServer, ?MODULE),
-                          Mod:register_client(Key2, {LServer, BackendRef}, Base64Token)
-                    end;
-                _ -> {error, xmpp:err_bad_request()}
+                  Key2 = {From#jid.luser, From#jid.lserver, ?NORMAL_PUSH_TYPE},
+                  Mod = gen_mod:db_mod(LServer, ?MODULE),
+                  Mod:register_client(Key2, {LServer, BackendRef}, Base64Token);
+                _ ->
+                  {error, xmpp:err_bad_request()}
             end
     end;
 adhoc_perform_action(<<"register-push-apns-voip">>, #jid{lserver = LServer} = From, XData) ->
   BackendRef = case xmpp_util:get_xdata_values(<<"backend_ref">>, XData) of
-                 [Key] -> {mod_pushoff_apns_h2, Key};
-                 _ -> {mod_pushoff_apns_h2, <<"voip">>}
+                 [Key] -> {mod_pushoff_apns_curl, Key};
+                 _ -> {mod_pushoff_apns_curl, <<"voip">>}
                end,
   case validate_backend_ref(LServer, BackendRef) of
     {error, E} -> {error, E};
     {ok, BackendRef} ->
       case xmpp_util:get_xdata_values(<<"token">>, XData) of
         [Base64Token] ->
-          case catch base64:decode(Base64Token) of
-            {'EXIT', _} -> {error, xmpp:err_bad_request()};
-            _Token ->
-              Key2 = {From#jid.luser, From#jid.server, ?VOIP_PUSH_TYPE},
-              Mod = gen_mod:db_mod(LServer, ?MODULE),
-              Mod:register_client(Key2, {LServer, BackendRef}, Base64Token)
-          end;
-        _ -> {error, xmpp:err_bad_request()}
+          Key2 = {From#jid.luser, From#jid.server, ?VOIP_PUSH_TYPE},
+          Mod = gen_mod:db_mod(LServer, ?MODULE),
+          Mod:register_client(Key2, {LServer, BackendRef}, Base64Token);
+        _ ->
+          {error, xmpp:err_bad_request()}
       end
   end;
 adhoc_perform_action(<<"register-push-fcm">>, #jid{lserver = LServer} = From, XData) ->
@@ -415,9 +409,8 @@ parse_backend(Opts) ->
                    path => proplists:get_value(path, Opts),
                    topic => proplists:get_value(topic, Opts)};
            X ->
-             #{backend_type => X,
-               certfile => proplists:get_value(certfile, Opts),
-               gateway => proplists:get_value(gateway, Opts),
+             #{backend_type => mod_pushoff_apns_curl,
+               path => proplists:get_value(path, Opts),
                topic => proplists:get_value(topic, Opts)}
          end}.
 
