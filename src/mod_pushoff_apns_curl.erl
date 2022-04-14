@@ -14,6 +14,8 @@
 
 -behaviour(gen_server).
 
+-include("logger.hrl").
+
 %% API
 -export([start_link/0]).
 
@@ -119,15 +121,20 @@ execute_curl(body, Path, Topic, Token, ApnPushType, Title, Body) ->
     ++ " " ++ ApnPushType
     ++ " " ++ Title
     ++ " " ++ Body,
-  os:cmd(Cmd);
-
+  ?DEBUG("cmd =  ",[Cmd]),
+  Result = os:cmd(Cmd),
+  ?DEBUG("Result = ",[Result]),
+  ok;
 execute_curl(message, Path, Topic, Token, ApnPushType, Title, _Body) ->
   Cmd = Path
     ++ " " ++ Topic
     ++ " " ++ Token
     ++ " " ++ ApnPushType
     ++ " " ++ Title,
-  os:cmd(Cmd);
+  ?DEBUG("cmd =  ",[Cmd]),
+  Result = os:cmd(Cmd),
+  ?DEBUG("Result = ",[Result]),
+  ok;
 execute_curl(voip, Path, Topic, Token, ApnPushType, Title, _Body) ->
   VoipTopic = Topic + ".voip",
   Cmd = Path
@@ -135,6 +142,9 @@ execute_curl(voip, Path, Topic, Token, ApnPushType, Title, _Body) ->
     ++ " " ++ Token
     ++ " " ++ ApnPushType
     ++ " " ++ Title,
-  os:cmd(Cmd).
+  ?DEBUG("cmd =  ",[Cmd]),
+  Result = os:cmd(Cmd),
+  ?DEBUG("Result =  ",[Result]),
+  ok.
 
 
