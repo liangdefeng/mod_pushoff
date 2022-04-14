@@ -145,10 +145,6 @@ offline_message({_, #message{to = #jid{lserver = _LServer} = To,
       ok;
     Record ->
       case Record of
-        #push_notification{xdata = #xdata{fields = [#xdata_field{var = <<"type">>, values=[Type]}]}} ->
-          Type2 = binary_to_atom(string:lowercase(Type), unicode),
-          #jid{user = FromUser} = From,
-          send_notification(Id, binary_to_list(FromUser), To, "", Type2, ok);
         #push_notification{xdata = #xdata{fields = [#xdata_field{var = <<"type">>, values=[Type]},
           #xdata_field{var = <<"message">>, values = [MsgBinary]}]}} ->
           Type2 = binary_to_atom(string:lowercase(Type), unicode),
@@ -157,7 +153,6 @@ offline_message({_, #message{to = #jid{lserver = _LServer} = To,
 
         #push_notification{xdata = #xdata{fields = [#xdata_field{var = <<"type">>, values=[Type]},
           #xdata_field{var = <<"status">>, values = [StatusBinary]}]}} ->
-
           Status = binary_to_atom(string:lowercase(StatusBinary), unicode),
           case Status of
             start ->
@@ -169,6 +164,10 @@ offline_message({_, #message{to = #jid{lserver = _LServer} = To,
               #jid{user = FromUser} = From,
               send_notification(Id, binary_to_list(FromUser), To, <<>>, Type2, Status)
           end;
+        #push_notification{xdata = #xdata{fields = [#xdata_field{var = <<"type">>, values=[Type]}]}} ->
+          Type2 = binary_to_atom(string:lowercase(Type), unicode),
+          #jid{user = FromUser} = From,
+          send_notification(Id, binary_to_list(FromUser), To, "", Type2, ok);
         _ ->
           ok
       end
