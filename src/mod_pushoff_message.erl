@@ -3,7 +3,7 @@
 
 %% API
 -export([
-  body/1, title/1, from/1, apns_push_type/1
+  body/1, title/1, from/1, apns_push_type/1, push_type/1
 ]).
 
 body(Payload) ->
@@ -17,3 +17,6 @@ from(Payload) ->
 
 apns_push_type(Payload) ->
   proplists:get_value(apns_push_type, Payload, <<>>).
+
+push_type(Payload) ->
+  proplists:get_value(push_type, Payload, none).

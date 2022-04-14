@@ -54,9 +54,10 @@
 stanza_to_payload(MsgId, MsgType, MsgStatus, FromUser, Data) ->
   PushType = case get_msg_type(MsgType,MsgStatus) of
               call -> [
-                  {push_type, call},
-                  {apns_push_type, ?VOIP}
-                ];
+                {push_type, voip},
+                {title, get_title(MsgType, MsgStatus, FromUser)},
+                {apns_push_type, ?VOIP}
+              ];
               message -> [
                 {push_type, message},
                 {apns_push_type, ?ALERT},
@@ -137,7 +138,7 @@ offline_message({_, #message{to = To,
       end
   end,
   Acc;
-offline_message({_, #message{to = #jid{lserver = LServer} = To,
+offline_message({_, #message{to = #jid{lserver = _LServer} = To,
   from = From, id = Id} = Stanza} = Acc) ->
   case xmpp:try_subtag(Stanza, #push_notification{}) of
     false ->
@@ -401,15 +402,23 @@ parse_backend(Opts) ->
     #{ref => Ref,
       config =>
          case backend_type(Ref) of
-             mod_pushoff_fcm ->
-                 #{backend_type => mod_pushoff_fcm,
-                   gateway => proplists:get_value(gateway, Opts),
-                   api_key => proplists:get_value(api_key, Opts)};
-             X when X == mod_pushoff_apns orelse X == mod_pushoff_apns_h2 ->
-                 #{backend_type => X,
+           mod_pushoff_fcm ->
+             #{backend_type => mod_pushoff_fcm,
+               gateway => proplists:get_value(gateway, Opts),
+               api_key => proplists:get_value(api_key, Opts)};
+           mod_pushoff_apns_h2 ->
+                 #{backend_type => mod_pushoff_apns_h2,
                    certfile => proplists:get_value(certfile, Opts),
+                   team_id => proplists:get_value(team_id, Opts),
+                   key_id => proplists:get_value(key_id, Opts),
+                   key_file => proplists:get_value(key_file, Opts),
                    gateway => proplists:get_value(gateway, Opts),
-                   topic => proplists:get_value(topic, Opts)}
+                   topic => proplists:get_value(topic, Opts)};
+           X ->
+             #{backend_type => X,
+               certfile => proplists:get_value(certfile, Opts),
+               gateway => proplists:get_value(gateway, Opts),
+               topic => proplists:get_value(topic, Opts)}
          end}.
 
 % -spec backend() -> yconf:validator(jid:jid()).
@@ -432,8 +441,10 @@ backend() ->
 
 -spec(backend_worker(backend_id()) -> atom()).
 
-backend_worker({Host, {T, R}}) -> gen_mod:get_module_proc(Host, binary_to_atom(<<(erlang:atom_to_binary(T, latin1))/binary, "_", R/binary>>, latin1));
-backend_worker({Host, Ref}) -> gen_mod:get_module_proc(Host, Ref).
+backend_worker({Host, {T, R}}) ->
+  gen_mod:get_module_proc(Host, binary_to_atom(<<(erlang:atom_to_binary(T, latin1))/binary, "_", R/binary>>, latin1));
+backend_worker({Host, Ref}) ->
+  gen_mod:get_module_proc(Host, Ref).
 
 backend_configs(Host) ->
     parse_backends(gen_mod:get_module_opt(Host, ?MODULE, backends)).
@@ -481,4 +492,10 @@ get_title(_, _, FromUser) ->
   "Text message from" ++ FromUser.
 
 get_body(Body) ->
-  binary_to_list(Body).
+  [Data2 | _Rest] = string:split(Body, "\n"),
+  Len = string:length(Data2),
+  if Len > 15 ->
+      string:slice(binary_to_list(Data2),0,15) ++ "...";
+    true ->
+      binary_to_list(Data2)
+  end.
