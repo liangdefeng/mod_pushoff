@@ -485,7 +485,7 @@ get_title(voice, _, FromUser) ->
 get_title(video, _, FromUser) ->
   "Video message from " ++ FromUser;
 get_title(_, _, FromUser) ->
-  "Text message from" ++ FromUser.
+  "Text message from " ++ FromUser.
 
 get_body(Body) ->
   [Data2 | _Rest] = string:split(Body, "\n"),

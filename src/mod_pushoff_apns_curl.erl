@@ -118,21 +118,21 @@ send_notification(Token, Payload, Path, Topic) ->
 
 execute_curl(body, Path, Topic, Token, ApnPushType, Title, Body) ->
   Cmd = Path
-    ++ " " ++ Topic
-    ++ " " ++ Token
-    ++ " " ++ ApnPushType
-    ++ " " ++ Title
-    ++ " " ++ Body,
+    ++ " '" ++ Topic
+    ++ "' '" ++ Token
+    ++ "' '" ++ ApnPushType
+    ++ "' '" ++ Title
+    ++ "' '" ++ Body  ++ "'",
   ?DEBUG("cmd = ~p~n ",[Cmd]),
   Result = os:cmd(Cmd),
   ?DEBUG("Result = ~p~n ",[Result]),
   ok;
 execute_curl(message, Path, Topic, Token, ApnPushType, Title, _Body) ->
   Cmd = Path
-    ++ " " ++ Topic
-    ++ " " ++ Token
-    ++ " " ++ ApnPushType
-    ++ " " ++ Title,
+    ++ " '" ++ Topic
+    ++ "' '" ++ Token
+    ++ "' '" ++ ApnPushType
+    ++ "' '" ++ Title ++ "'",
   ?DEBUG("cmd = ~p~n ",[Cmd]),
   Result = os:cmd(Cmd),
   ?DEBUG("Result = ~p~n ",[Result]),
@@ -140,10 +140,10 @@ execute_curl(message, Path, Topic, Token, ApnPushType, Title, _Body) ->
 execute_curl(voip, Path, Topic, Token, ApnPushType, Title, _Body) ->
   VoipTopic = Topic + ".voip",
   Cmd = Path
-    ++ " " ++ VoipTopic
-    ++ " " ++ Token
-    ++ " " ++ ApnPushType
-    ++ " " ++ Title,
+    ++ " '" ++ VoipTopic
+    ++ "' '" ++ Token
+    ++ "' '" ++ ApnPushType
+    ++ "' '" ++ Title ++ "'",
   ?DEBUG("cmd = ~p~n ",[Cmd]),
   Result = os:cmd(Cmd),
   ?DEBUG("Result = ~p~n ",[Result]),
