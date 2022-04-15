@@ -485,10 +485,11 @@ get_title(_, _, FromUser) ->
   "Text message from " ++ FromUser.
 
 get_body(Body) ->
-  [Data2 | _Rest] = string:split(Body, "\n"),
+  NewBody = mod_pushoff_utils:force_string(Body),
+  [Data2 | _Rest] = string:split(NewBody, "\n"),
   Len = string:length(Data2),
   if Len > 15 ->
-      string:slice(binary_to_list(Data2),0,15) ++ "...";
+      string:slice(Data2,0,15) ++ "...";
     true ->
       binary_to_list(Data2)
   end.
