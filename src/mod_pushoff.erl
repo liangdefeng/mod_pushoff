@@ -40,6 +40,11 @@
 -define(ALERT, "alert").
 -define(VOIP, "voip").
 
+-define(OMEMO_ENCRYPTED_MESSAGE, <<73,32, 115,101,110,116,32,121,111,117,32,97,110,32,79,77,69,77,79,32,101,110,99,
+  114,121,112,116,101,100,32,109,101,115,115,97,103,101,32,98,117,116,32,121,111,117,114,32,99,108,105,101,110,116,
+  32,100,111,101,115,110,226,128,153,116,32,115,101,101,109,32,116,111,32,115,117,112,112,111,114,116,32,116,104,97,
+  116,46>>).
+
 -define(NORMAL_PUSH_TYPE, 0).
 -define(VOIP_PUSH_TYPE, 1).
 
@@ -117,28 +122,23 @@ get_room_title(From) ->
 offline_message({_, #message{to = To,
   from = From, id = Id, body = [#text{data = Data}] = Body} = Stanza} = Acc) ->
   ?DEBUG("Stanza is ~p~n",[Stanza]),
-  case Data of
-    <<"I sent you an OMEMO encrypted message but your client doesn’t seem to support that.">> ->
+  case string:slice(Data, 0, 19) of
+    <<"aesgcm://w-4all.com">> -> %% Messages start with aesgcm are video or voice messages.
       ok;
     _ ->
-      case string:slice(Data, 0, 19) of
-        <<"aesgcm://w-4all.com">> -> %% Messages start with aesgcm are video or voice messages.
-          ok;
+      case is_muc(From) of
+        true ->
+          FromResource = From#jid.lresource,
+          RoomTitle = get_room_title(From),
+          FromUser = binary_to_list(FromResource) ++ " group " ++  RoomTitle,
+          send_notification(Id, FromUser, To, Data, offline, missed);
         _ ->
-          case is_muc(From) of
-            true ->
-              FromResource = From#jid.lresource,
-              RoomTitle = get_room_title(From),
-              FromUser = binary_to_list(FromResource) ++ " group " ++  RoomTitle,
-              send_notification(Id, FromUser, To, Data, offline, missed);
+          case Body of
+            [] ->
+              ok;
             _ ->
-              case Body of
-                [] ->
-                  ok;
-                _ ->
-                  #jid{user = FromUser} = From,
-                  send_notification(Id, binary_to_list(FromUser), To, Data, offline, missed)
-              end
+              #jid{user = FromUser} = From,
+              send_notification(Id, binary_to_list(FromUser), To, Data, offline, missed)
           end
       end
   end,
@@ -148,6 +148,7 @@ offline_message({_, #message{to = To, from = From, id = Id} = Stanza} = Acc) ->
     false ->
       ok;
     Record ->
+      ?DEBUG("Stanza is ~p~n",[Stanza]),
       case Record of
         #push_notification{xdata = #xdata{fields = [#xdata_field{var = <<"type">>, values=[Type]},
           #xdata_field{var = <<"message">>, values = [MsgBinary]}]}} ->
