@@ -491,5 +491,5 @@ get_body(Body) ->
   if Len > 15 ->
       string:slice(Data2,0,15) ++ "...";
     true ->
-      binary_to_list(Data2)
+      Data2
   end.
