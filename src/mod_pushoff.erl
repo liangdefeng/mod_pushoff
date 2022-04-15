@@ -117,23 +117,28 @@ get_room_title(From) ->
 offline_message({_, #message{to = To,
   from = From, id = Id, body = [#text{data = Data}] = Body} = Stanza} = Acc) ->
   ?DEBUG("Stanza is ~p~n",[Stanza]),
-  case string:slice(Data, 0, 19) of
-    <<"aesgcm://w-4all.com">> -> %% Messages start with aesgcm are video or voice messages.
+  case Data of
+    <<"I sent you an OMEMO encrypted message but your client doesn’t seem to support that.">> ->
       ok;
     _ ->
-      case is_muc(From) of
-        true ->
-          FromResource = From#jid.lresource,
-          RoomTitle = get_room_title(From),
-          FromUser = binary_to_list(FromResource) ++ " group " ++  RoomTitle,
-          send_notification(Id, FromUser, To, Data, offline, missed);
+      case string:slice(Data, 0, 19) of
+        <<"aesgcm://w-4all.com">> -> %% Messages start with aesgcm are video or voice messages.
+          ok;
         _ ->
-          case Body of
-            [] ->
-              ok;
+          case is_muc(From) of
+            true ->
+              FromResource = From#jid.lresource,
+              RoomTitle = get_room_title(From),
+              FromUser = binary_to_list(FromResource) ++ " group " ++  RoomTitle,
+              send_notification(Id, FromUser, To, Data, offline, missed);
             _ ->
-              #jid{user = FromUser} = From,
-              send_notification(Id, binary_to_list(FromUser), To, Data, offline, missed)
+              case Body of
+                [] ->
+                  ok;
+                _ ->
+                  #jid{user = FromUser} = From,
+                  send_notification(Id, binary_to_list(FromUser), To, Data, offline, missed)
+              end
           end
       end
   end,
