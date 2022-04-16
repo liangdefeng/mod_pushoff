@@ -3,9 +3,7 @@
 mod_pushoff sends empty push notifications for messages in ejabberd's offline queue.
 
 Supported backends:
-- `mod_pushoff_apns`: Apple APNs - deprecated.
-- `mod_pushoff_apns_h2`: [Apple APNs over http/2](https://developer.apple.com/documentation/usernotifications/setting_up_a_remote_notification_server/sending_notification_requests_to_apns)
-- `mod_pushoff_apns_h2_viop`: backends for APN VOIP notification [Apple APNs over http/2](https://developer.apple.com/documentation/usernotifications/setting_up_a_remote_notification_server/sending_notification_requests_to_apns)
+- `mod_pushoff_apns_curl`: [Token based Apple APNs over curl(http/2)](https://developer.apple.com/documentation/usernotifications/setting_up_a_remote_notification_server/sending_notification_requests_to_apns)
 - `mod_pushoff_fcm`: [Google Firebase Cloud Messaging HTTP Protocol](https://firebase.google.com/docs/cloud-messaging/http-server-ref)
 
 This module supports type of push notification in message (means extended type of message):
@@ -84,17 +82,11 @@ modules:
     db_type: sql
     backends:
       -
-        type: mod_pushoff_apns # deprecated
-        # make sure this pem file contains only one(!) certificate + key pair
-        certfile: "/etc/ssl/private/apns_example_app.pem"
-        gateway: "gateway.push.apple.com"
-      -
-        type: mod_pushoff_apns_h2
+        type: mod_pushoff_apns_curl
         # you can add more backends of each type by specifying backend_ref with unique names
-        backend_ref: "sandbox"
+        backend_ref: "production"
         # make sure this pem file contains only one(!) certificate + key pair
-        certfile: "/etc/ssl/private/apns_example_app_sandbox.pem"
-        gateway: "gateway.sandbox.push.apple.com"
+        path: "/etc/ssl/private/apns_example_app_sandbox.pem"
         topic: "com.acme.your.app" # this should be your bundle id
       -
         type: mod_pushoff_fcm
@@ -115,7 +107,7 @@ Clients can register for push notifications by sending XEP-0004 adhoc requests.
 These are the available adhoc commands:
 
 * `register-push-apns`: register with APNS
-* `register-push-apns-h2`: register with APNS/h2
+* `register-push-apns-voip`: register with APNS/h2
 * `register-push-fcm`: register with Firebase
 * `list-push-registrations`: request a list of all registrations
 * `unregister-push`: delete all user's registrations

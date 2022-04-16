@@ -90,7 +90,7 @@ get_msg_type(MsgType,MsgStatus) ->
     {files, _} -> message;
     {video, _} -> message;
     {voice, _} -> message;
-    {_, _} -> body
+    {_, _} -> message
   end.
 
 -spec(dispatch(pushoff_registration(), [{atom(), any()}]) -> ok).
