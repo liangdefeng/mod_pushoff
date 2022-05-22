@@ -116,6 +116,8 @@ send_notification(Token, Payload, Path, Topic) ->
 
 execute_curl(voip, Path, Topic, Token, Payload) ->
 
+  ?DEBUG("Payload = ~p~n ",[Payload]),
+
   ApnPushType = proplists:get_value(apns_push_type, Payload),
   Type = proplists:get_value(type, Payload),
   Status = proplists:get_value(status, Payload),
@@ -128,11 +130,11 @@ execute_curl(voip, Path, Topic, Token, Payload) ->
     ++ " '" ++ VoipTopic
     ++ "' '" ++ Token
     ++ "' '" ++ ApnPushType
-    ++ "' '" ++ Type
-    ++ "' '" ++ Status
-    ++ "' '" ++ RoomId
-    ++ "' '" ++ Sender
-    ++ "' '" ++ Time
+    ++ "' '" ++ binary_to_list(Type)
+    ++ "' '" ++ binary_to_list(Status)
+    ++ "' '" ++ binary_to_list(RoomId)
+    ++ "' '" ++ binary_to_list(Sender)
+    ++ "' '" ++ binary_to_list(Time)
     ++ "'",
 
   ?DEBUG("cmd = ~p~n ",[Cmd]),

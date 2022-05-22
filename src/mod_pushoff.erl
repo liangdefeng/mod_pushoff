@@ -58,22 +58,20 @@
 
 stanza_to_payload(MsgId, FromUser, DataMap) ->
 
-  MsgTypeStr = maps:get(type, DataMap, ""),
-  MsgType = binary_to_atom(string:to_lower(MsgTypeStr), unicode),
+  MsgTypeStr = maps:get(type, DataMap, <<"">>),
+  StatusStr = maps:get(status, DataMap, <<"">>),
+  Sender = maps:get(sender, DataMap, <<"">>),
+  RoomId = maps:get(roomid, DataMap, <<"">>),
+  Time = maps:get(time, DataMap, <<"">>),
 
-  StatusStr = maps:get(status, DataMap, ""),
-  Status = binary_to_atom(string:to_lower(StatusStr), unicode),
-
-  Sender = maps:get(sender, DataMap, ""),
-  RoomId = maps:get(roomid, DataMap, ""),
-  Time = maps:get(time, DataMap, ""),
-
+  MsgType = binary_to_atom(MsgTypeStr, unicode),
+  Status = binary_to_atom(StatusStr, unicode),
   PushType = case get_msg_type(MsgType, Status) of
               call -> [
                 {push_type, voip},
                 {roomid, RoomId},
-                {type, MsgType},
-                {status, Status},
+                {type, MsgTypeStr},
+                {status, StatusStr},
                 {sender, Sender},
                 {time, Time},
                 {apns_push_type, ?VOIP}
@@ -175,7 +173,7 @@ fields_to_map(Fields) ->
       fun(Item) ->
         case Item of
           #xdata_field{var = Var, values=[Values]} ->
-            {binary_to_atom(Var, unicode), Values};
+            {true, {binary_to_atom(Var, unicode), Values}};
           _ ->
             false
         end
@@ -188,7 +186,7 @@ send_notification(MsgId, FromUser, To, DataMap) ->
   case proplists:get_value(push_type, Payload, none) of
     none ->
       ok;
-    call ->
+    voip ->
       LServer = To#jid.lserver,
       Key = {To#jid.luser, To#jid.lserver, ?VOIP_PUSH_TYPE},
       Mod = gen_mod:db_mod(LServer, ?MODULE),
