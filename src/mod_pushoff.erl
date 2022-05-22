@@ -95,9 +95,9 @@ stanza_to_payload(MsgId, FromUser, DataMap) ->
   [{id, MsgId} | PushType];
 stanza_to_payload(_MsgId, _FromUser, _DataMap) -> [].
 
-get_msg_type(start) ->
+get_msg_type(_, start) ->
   call;
-get_msg_type(_) ->
+get_msg_type(_, _) ->
   message.
 
 -spec(dispatch(pushoff_registration(), [{atom(), any()}]) -> ok).
@@ -138,14 +138,18 @@ offline_message({_, #message{to = To,
           FromResource = From#jid.lresource,
           RoomTitle = get_room_title(From),
           FromUser = binary_to_list(FromResource) ++ " group " ++  RoomTitle,
-          send_notification(Id, FromUser, To, Data, offline, missed);
+          DataList = [{type, offine}, {status, <<"missed">>}, {body, Data}],
+          FieldMap = maps:from_list(DataList),
+          send_notification(Id, FromUser, To, FieldMap);
         _ ->
           case Body of
             [] ->
               ok;
             _ ->
               #jid{user = FromUser} = From,
-              send_notification(Id, binary_to_list(FromUser), To, Data, offline, missed)
+              DataList = [{type, offine}, {status, <<"missed">>}, {body, Data}],
+              FieldMap = maps:from_list(DataList),
+              send_notification(Id, binary_to_list(FromUser), To, FieldMap)
           end
       end
   end,
