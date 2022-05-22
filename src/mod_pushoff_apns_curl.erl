@@ -107,16 +107,44 @@ code_change(_OldVsn, State = #state{}, _Extra) ->
 %%%===================================================================
 
 send_notification(Token, Payload, Path, Topic) ->
+
   NewToken = mod_pushoff_utils:force_string(base64:decode(Token)),
+  NewPath = mod_pushoff_utils:force_string(Path),
+  NewTopic = mod_pushoff_utils:force_string(Topic),
   PushType = mod_pushoff_message:push_type(Payload),
+  execute_curl(PushType, NewPath, NewTopic, NewToken, Payload).
+
+execute_curl(voip, Path, Topic, Token, Payload) ->
+
+  ApnPushType = proplists:get_value(apns_push_type, Payload),
+  Type = proplists:get_value(type, Payload),
+  Status = proplists:get_value(status, Payload),
+  RoomId = proplists:get_value(roomid, Payload),
+  Sender = proplists:get_value(sender, Payload),
+  Time = proplists:get_value(time, Payload),
+
+  VoipTopic = Topic,
+  Cmd = Path
+    ++ " '" ++ VoipTopic
+    ++ "' '" ++ Token
+    ++ "' '" ++ ApnPushType
+    ++ "' '" ++ Type
+    ++ "' '" ++ Status
+    ++ "' '" ++ RoomId
+    ++ "' '" ++ Sender
+    ++ "' '" ++ Time
+    ++ "'",
+
+  ?DEBUG("cmd = ~p~n ",[Cmd]),
+  Result = os:cmd(Cmd),
+  ?DEBUG("Result = ~p~n ",[Result]),
+  ok;
+execute_curl(body, Path, Topic, Token, Payload) ->
+
   ApnPushType = mod_pushoff_message:apns_push_type(Payload),
   Title = mod_pushoff_message:title(Payload),
   Body = mod_pushoff_message:body(Payload),
-  NewPath = mod_pushoff_utils:force_string(Path),
-  NewTopic = mod_pushoff_utils:force_string(Topic),
-  execute_curl(PushType, NewPath, NewTopic, NewToken, ApnPushType, Title, Body).
 
-execute_curl(body, Path, Topic, Token, ApnPushType, Title, Body) ->
   Cmd = Path
     ++ " '" ++ Topic
     ++ "' '" ++ Token
@@ -127,7 +155,9 @@ execute_curl(body, Path, Topic, Token, ApnPushType, Title, Body) ->
   Result = os:cmd(Cmd),
   ?DEBUG("Result = ~p~n ",[Result]),
   ok;
-execute_curl(message, Path, Topic, Token, ApnPushType, Title, _Body) ->
+execute_curl(message, Path, Topic, Token, Payload) ->
+  ApnPushType = mod_pushoff_message:apns_push_type(Payload),
+  Title = mod_pushoff_message:title(Payload),
   Cmd = Path
     ++ " '" ++ Topic
     ++ "' '" ++ Token
@@ -136,17 +166,7 @@ execute_curl(message, Path, Topic, Token, ApnPushType, Title, _Body) ->
   ?DEBUG("cmd = ~p~n ",[Cmd]),
   Result = os:cmd(Cmd),
   ?DEBUG("Result = ~p~n ",[Result]),
-  ok;
-execute_curl(voip, Path, Topic, Token, ApnPushType, Title, _Body) ->
-  VoipTopic = Topic + ".voip",
-  Cmd = Path
-    ++ " '" ++ VoipTopic
-    ++ "' '" ++ Token
-    ++ "' '" ++ ApnPushType
-    ++ "' '" ++ Title ++ "'",
-  ?DEBUG("cmd = ~p~n ",[Cmd]),
-  Result = os:cmd(Cmd),
-  ?DEBUG("Result = ~p~n ",[Result]),
   ok.
+
 
 

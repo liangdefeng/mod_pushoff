@@ -56,42 +56,49 @@
 % dispatch to workers
 %
 
-stanza_to_payload(MsgId, MsgType, MsgStatus, FromUser, Data) ->
-  PushType = case get_msg_type(MsgType,MsgStatus) of
+stanza_to_payload(MsgId, FromUser, DataMap) ->
+
+  MsgTypeStr = maps:get(type, DataMap, ""),
+  MsgType = binary_to_atom(string:to_lower(MsgTypeStr), unicode),
+
+  StatusStr = maps:get(status, DataMap, ""),
+  Status = binary_to_atom(string:to_lower(StatusStr), unicode),
+
+  Sender = maps:get(sender, DataMap, ""),
+  RoomId = maps:get(roomid, DataMap, ""),
+  Time = maps:get(time, DataMap, ""),
+
+  PushType = case get_msg_type(MsgType, Status) of
               call -> [
                 {push_type, voip},
-                {title, get_title(MsgType, MsgStatus, FromUser)},
+                {roomid, RoomId},
+                {type, MsgType},
+                {status, Status},
+                {sender, Sender},
+                {time, Time},
                 {apns_push_type, ?VOIP}
               ];
               message -> [
                 {push_type, message},
                 {apns_push_type, ?ALERT},
-                {title, get_title(MsgType, MsgStatus, FromUser)},
+                {title, get_title(MsgType, Status, FromUser)},
                 {from, FromUser}
               ];
               body -> [
                 {push_type, body},
                 {apns_push_type, ?ALERT},
-                {title, get_title(MsgType, MsgStatus, FromUser)},
-                {body, get_body(Data)},
+                {title, get_title(MsgType, Status, FromUser)},
                 {from, FromUser}
               ];
               _ -> []
              end,
   [{id, MsgId} | PushType];
-stanza_to_payload(_MsgId, _MsgType, _MsgStatus, _FromUser, _Data) -> [].
+stanza_to_payload(_MsgId, _FromUser, _DataMap) -> [].
 
-get_msg_type(MsgType,MsgStatus) ->
-  case {MsgType,MsgStatus} of
-    {voice, start} -> call;
-    {video, start} -> call;
-    {location, _} -> message;
-    {photo, _} -> message;
-    {files, _} -> message;
-    {video, _} -> message;
-    {voice, _} -> message;
-    {_, _} -> message
-  end.
+get_msg_type(start) ->
+  call;
+get_msg_type(_) ->
+  message.
 
 -spec(dispatch(pushoff_registration(), [{atom(), any()}]) -> ok).
 
@@ -147,45 +154,33 @@ offline_message({_, #message{to = To, from = From, id = Id} = Stanza} = Acc) ->
   case xmpp:try_subtag(Stanza, #push_notification{}) of
     false ->
       ok;
-    Record ->
-      ?DEBUG("Stanza is ~p~n",[Stanza]),
-      case Record of
-        #push_notification{xdata = #xdata{fields = [#xdata_field{var = <<"type">>, values=[Type]},
-          #xdata_field{var = <<"message">>, values = [MsgBinary]}]}} ->
-          ?DEBUG("Type is ~p~n",[Type]),
-          Type2 = binary_to_atom(string:lowercase(Type), unicode),
-          #jid{user = FromUser} = From,
-          send_notification(Id, binary_to_list(FromUser), To, MsgBinary, Type2, ok);
+    #push_notification{xdata = #xdata{fields = Fields}} ->
+      ?DEBUG("Fields is ~p~n",[Fields]),
+      #jid{user = FromUser} = From,
+      FieldMap = fields_to_map(Fields),
+      send_notification(Id, binary_to_list(FromUser), To, FieldMap)
 
-        #push_notification{xdata = #xdata{fields = [#xdata_field{var = <<"type">>, values=[Type]},
-          #xdata_field{var = <<"status">>, values = [StatusBinary]}]}} ->
-          ?DEBUG("Type is ~p~n",[Type]),
-          Status = binary_to_atom(string:lowercase(StatusBinary), unicode),
-          case Status of
-            start ->
-              ?DEBUG("Status is start, do nothing when user offline.~n",[]),
-              ok;
-            _ ->
-              ?DEBUG("Status is not start, send offfline notification.~n",[]),
-              Type2 = binary_to_atom(string:lowercase(Type), unicode),
-              #jid{user = FromUser} = From,
-              send_notification(Id, binary_to_list(FromUser), To, <<>>, Type2, Status)
-          end;
-        #push_notification{xdata = #xdata{fields = [#xdata_field{var = <<"type">>, values=[Type]}]}} ->
-          ?DEBUG("Type is ~p~n",[Type]),
-          Type2 = binary_to_atom(string:lowercase(Type), unicode),
-          #jid{user = FromUser} = From,
-          send_notification(Id, binary_to_list(FromUser), To, "", Type2, ok);
-        _ ->
-          ok
-      end
   end,
   Acc;
 offline_message(Acc) ->
   Acc.
 
-send_notification(MsgId, FromUser, To, Data, MsgType, MsgStatus) ->
-  Payload = stanza_to_payload(MsgId, MsgType, MsgStatus, FromUser, Data),
+fields_to_map(Fields) ->
+  maps:from_list(
+    lists:filtermap(
+      fun(Item) ->
+        case Item of
+          #xdata_field{var = Var, values=[Values]} ->
+            {binary_to_atom(Var, unicode), Values};
+          _ ->
+            false
+        end
+      end, Fields)).
+
+
+send_notification(MsgId, FromUser, To, DataMap) ->
+
+  Payload = stanza_to_payload(MsgId, FromUser, DataMap),
   case proplists:get_value(push_type, Payload, none) of
     none ->
       ok;
