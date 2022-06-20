@@ -57,14 +57,19 @@
 %
 
 stanza_to_payload(MsgId, FromUser, DataMap) ->
-
   MsgTypeStr = maps:get(type, DataMap, <<"">>),
   StatusStr = maps:get(status, DataMap, <<"">>),
   Sender = maps:get(sender, DataMap, <<"">>),
   RoomId = maps:get(roomid, DataMap, <<"">>),
   Time = maps:get(time, DataMap, <<"">>),
 
-  MsgType = binary_to_atom(MsgTypeStr, unicode),
+  MsgType = case is_atom(MsgTypeStr) of
+    true ->
+      MsgTypeStr;
+    _ ->
+      binary_to_atom(MsgTypeStr, unicode)
+  end,
+
   Status = binary_to_atom(StatusStr, unicode),
   PushType = case get_msg_type(MsgType, Status) of
               call -> [
