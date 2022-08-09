@@ -125,6 +125,27 @@ get_room_title(From) ->
       ""
   end.
 
+user_send_packet({_, #message{to = To, from = From, id = Id} = Stanza} = Acc) ->
+  case xmpp:try_subtag(Stanza, #push_notification{}) of
+    false ->
+      ok;
+    #push_notification{xdata = #xdata{fields = Fields}} ->
+      ?DEBUG("Fields is ~p~n",[Fields]),
+      #jid{user = FromUser} = From,
+      FieldMap = fields_to_map(Fields),
+      case {maps:get(type, FieldMap), maps:get(status, FieldMap)} of
+        {voice, start} ->
+          send_notification(Id, binary_to_list(FromUser), To, FieldMap);
+        {video, start} ->
+          send_notification(Id, binary_to_list(FromUser), To, FieldMap);
+        _ ->
+          ok
+      end
+  end,
+  Acc;
+user_send_packet(Acc) ->
+  Acc.
+
 %
 % ejabberd hooks
 %
@@ -341,6 +362,7 @@ adhoc_perform_action(_, _, _) ->
 -spec(start(Host :: binary(), Opts :: [any()]) -> any()).
 
 start(Host, Opts) ->
+    ok = ejabberd_hooks:add(user_send_packet,Host, ?MODULE, user_send_packet, 30),
     ok = ejabberd_hooks:add(remove_user, Host, ?MODULE, remove_user, 50),
     ok = ejabberd_hooks:add(offline_message_hook, Host, ?MODULE, offline_message, ?OFFLINE_HOOK_PRIO),
     ok = ejabberd_hooks:add(adhoc_local_commands, Host, ?MODULE, adhoc_local_commands, 75),
@@ -353,6 +375,7 @@ start(Host, Opts) ->
 
 stop(Host) ->
     ?DEBUG("mod_pushoff:stop(~p), pid=~p", [Host, self()]),
+    ok = ejabberd_hooks:delete(user_send_packet, Host, ?MODULE, user_send_packet, 30),
     ok = ejabberd_hooks:delete(adhoc_local_commands, Host, ?MODULE, adhoc_local_commands, 75),
     ok = ejabberd_hooks:delete(offline_message_hook, Host, ?MODULE, offline_message, ?OFFLINE_HOOK_PRIO),
     ok = ejabberd_hooks:delete(remove_user, Host, ?MODULE, remove_user, 50),
