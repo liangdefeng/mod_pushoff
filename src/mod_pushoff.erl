@@ -126,6 +126,7 @@ get_room_title(From) ->
   end.
 
 user_send_packet({_, #message{to = To, from = From, id = Id} = Stanza} = Acc) ->
+  ?DEBUG("user_send_packet START",[]),
   case xmpp:try_subtag(Stanza, #push_notification{}) of
     false ->
       ok;
@@ -134,9 +135,11 @@ user_send_packet({_, #message{to = To, from = From, id = Id} = Stanza} = Acc) ->
       #jid{user = FromUser} = From,
       FieldMap = fields_to_map(Fields),
       case {maps:get(type, FieldMap), maps:get(status, FieldMap)} of
-        {voice, start} ->
+        {<<"voice">>, <<"start">>} ->
+          ?DEBUG("Sending notification",[]),
           send_notification(Id, binary_to_list(FromUser), To, FieldMap);
-        {video, start} ->
+        {<<"video">>, <<"start">>} ->
+          ?DEBUG("Sending notification",[]),
           send_notification(Id, binary_to_list(FromUser), To, FieldMap);
         _ ->
           ok
