@@ -125,7 +125,7 @@ get_room_title(From) ->
       ""
   end.
 
-user_send_packet({_, #message{to = To, from = From, id = Id} = Stanza} = Acc) ->
+user_send_packet({#message{to = To, from = From, id = Id} = Stanza, _} = Acc) ->
   ?DEBUG("user_send_packet START",[]),
   case xmpp:try_subtag(Stanza, #push_notification{}) of
     false ->
