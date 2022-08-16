@@ -135,7 +135,7 @@ user_send_packet({#message{to = To, from = From, id = Id} = Stanza, _} = Acc) ->
       #jid{user = FromUser} = From,
       FieldMap = fields_to_map(Fields),
 
-      case {maps:get(type, FieldMap, <<"OK">>), maps:get(status, FieldMap, <<"OK">>)} of
+      case {maps:get(type, FieldMap, <<"">>), maps:get(status, FieldMap, <<"">>)} of
         {<<"voice">>, <<"start">>} ->
           ?DEBUG("Sending notification",[]),
           send_notification(Id, binary_to_list(FromUser), To, FieldMap);
