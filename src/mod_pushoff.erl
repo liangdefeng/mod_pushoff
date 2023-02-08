@@ -154,44 +154,52 @@ user_send_packet(Acc) ->
 % ejabberd hooks
 %
 -spec(offline_message({atom(), message()}) -> {atom(), message()}).
-offline_message({_, #message{to = To,
+offline_message({_, #message{to = To, type = Type,
   from = From, id = Id, body = [#text{data = Data}] = Body} = Stanza} = Acc) ->
   ?DEBUG("Stanza is ~p~n",[Stanza]),
   case string:slice(Data, 0, 19) of
     <<"aesgcm://w-4all.com">> -> %% Messages start with aesgcm are video or voice messages.
       ok;
     _ ->
-      case is_muc(From) of
+      if Type == <<"error">>; Type == <<"normal">> ->
+        ok;
         true ->
-          FromResource = From#jid.lresource,
-          RoomTitle = get_room_title(From),
-          FromUser = binary_to_list(FromResource) ++ " group " ++  RoomTitle,
-          DataList = [{type, offine}, {status, <<"missed">>}, {body, Data}],
-          FieldMap = maps:from_list(DataList),
-          send_notification(Id, FromUser, To, FieldMap);
-        _ ->
-          case Body of
-            [] ->
-              ok;
-            _ ->
-              #jid{user = FromUser} = From,
+          case is_muc(From) of
+            true ->
+              FromResource = From#jid.lresource,
+              RoomTitle = get_room_title(From),
+              FromUser = binary_to_list(FromResource) ++ " group " ++  RoomTitle,
               DataList = [{type, offine}, {status, <<"missed">>}, {body, Data}],
               FieldMap = maps:from_list(DataList),
-              send_notification(Id, binary_to_list(FromUser), To, FieldMap)
+              send_notification(Id, FromUser, To, FieldMap);
+            _ ->
+              case Body of
+                [] ->
+                  ok;
+                _ ->
+                  #jid{user = FromUser} = From,
+                  DataList = [{type, offine}, {status, <<"missed">>}, {body, Data}],
+                  FieldMap = maps:from_list(DataList),
+                  send_notification(Id, binary_to_list(FromUser), To, FieldMap)
+              end
           end
       end
   end,
   Acc;
-offline_message({_, #message{to = To, from = From, id = Id} = Stanza} = Acc) ->
-  case xmpp:try_subtag(Stanza, #push_notification{}) of
-    false ->
-      ok;
-    #push_notification{xdata = #xdata{fields = Fields}} ->
-      ?DEBUG("Fields is ~p~n",[Fields]),
-      #jid{user = FromUser} = From,
-      FieldMap = fields_to_map(Fields),
-      send_notification(Id, binary_to_list(FromUser), To, FieldMap)
+offline_message({_, #message{to = To, type = Type, from = From, id = Id} = Stanza} = Acc) ->
+  if Type == <<"error">>; Type == <<"normal">> ->
+    ok;
+    true ->
+      case xmpp:try_subtag(Stanza, #push_notification{}) of
+        false ->
+          ok;
+        #push_notification{xdata = #xdata{fields = Fields}} ->
+          ?DEBUG("Fields is ~p~n",[Fields]),
+          #jid{user = FromUser} = From,
+          FieldMap = fields_to_map(Fields),
+          send_notification(Id, binary_to_list(FromUser), To, FieldMap)
 
+      end
   end,
   Acc;
 offline_message(Acc) ->
