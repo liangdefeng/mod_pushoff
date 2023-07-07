@@ -146,13 +146,15 @@ execute_curl(body, Path, Topic, Token, Payload) ->
   ApnPushType = mod_pushoff_message:apns_push_type(Payload),
   Title = mod_pushoff_message:title(Payload),
   Body = mod_pushoff_message:body(Payload),
+  MessageId = mod_pushoff_message:message_id(Payload),
 
   Cmd = Path
     ++ " '" ++ Topic
     ++ "' '" ++ Token
     ++ "' '" ++ ApnPushType
     ++ "' '" ++ Title
-    ++ "' '" ++ Body  ++ "'",
+    ++ "' '" ++ Body
+    ++ "' '" ++ MessageId  ++ "'",
   ?DEBUG("cmd = ~p~n ",[Cmd]),
   Result = os:cmd(Cmd),
   ?DEBUG("Result = ~p~n ",[Result]),
