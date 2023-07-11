@@ -147,6 +147,7 @@ execute_curl(body, Path, Topic, Token, Payload) ->
   Title = mod_pushoff_message:title(Payload),
   Body = mod_pushoff_message:body(Payload),
   MessageId = mod_pushoff_message:message_id(Payload),
+  From = mod_pushoff_message:from(Payload),
 
   Cmd = Path
     ++ " '" ++ Topic
@@ -154,7 +155,9 @@ execute_curl(body, Path, Topic, Token, Payload) ->
     ++ "' '" ++ ApnPushType
     ++ "' '" ++ Title
     ++ "' '" ++ Body
-    ++ "' '" ++ MessageId  ++ "'",
+    ++ "' '" ++ binary_to_list(MessageId)
+    ++ "' '" ++ From  
+    ++ "'",
   ?DEBUG("cmd = ~p~n ",[Cmd]),
   Result = os:cmd(Cmd),
   ?DEBUG("Result = ~p~n ",[Result]),
@@ -162,15 +165,19 @@ execute_curl(body, Path, Topic, Token, Payload) ->
 execute_curl(message, Path, Topic, Token, Payload) ->
   ApnPushType = mod_pushoff_message:apns_push_type(Payload),
   Title = mod_pushoff_message:title(Payload),
+  MessageId = mod_pushoff_message:message_id(Payload),
+  From = mod_pushoff_message:from(Payload),
+
   Cmd = Path
     ++ " '" ++ Topic
     ++ "' '" ++ Token
     ++ "' '" ++ ApnPushType
-    ++ "' '" ++ Title ++ "'",
-  ?DEBUG("cmd = ~p~n ",[Cmd]),
+    ++ "' '" ++ Title
+    ++ "' '" ++ binary_to_list(<<>>)
+    ++ "' '" ++ binary_to_list(MessageId) 
+    ++ "' '" ++ From
+    ++ "'",
+  ?INFO_MSG("cmd = ~p~n ",[Cmd]),
   Result = os:cmd(Cmd),
   ?DEBUG("Result = ~p~n ",[Result]),
   ok.
-
-
-

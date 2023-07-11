@@ -3,7 +3,7 @@
 
 %% API
 -export([
-  body/1, title/1, from/1, apns_push_type/1, push_type/1
+  body/1, title/1, from/1, apns_push_type/1, push_type/1, message_id/1
 ]).
 
 body(Payload) ->
@@ -11,6 +11,9 @@ body(Payload) ->
 
 title(Payload) ->
   proplists:get_value(title, Payload).
+
+message_id(Payload) ->
+  proplists:get_value(id, Payload, <<>>).
 
 from(Payload) ->
   proplists:get_value(from, Payload, <<>>).

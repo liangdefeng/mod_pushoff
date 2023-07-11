@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS `pushoff_tbl`(
   `backend_server`  VARCHAR(30) NOT NULL comment "backend server",
   `backend_id`      VARCHAR(30) NOT NULL comment "sample value: mod_pushoff_apns_h2",
   `backend_ref`     VARCHAR(20) NOT NULL comment "sample value: sandbox_voip",
+  `apns_enviroment`     VARCHAR(20) default 'production' NOT NULL comment "sample value: sandbox / production",
   `timestamp`       BIGINT NOT NULL,
   PRIMARY KEY(`bare_jid`, `push_type`)
 );
